@@ -1,0 +1,106 @@
+<odoo>
+    <record id="view_telegram_config_list" model="ir.ui.view">
+        <field name="name">telegram.config.list</field>
+        <field name="model">telegram.config</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="channel_id"/>
+                <field name="bot_running"
+                    widget="bool_badge" 
+                    string="Bot Status"
+                    />
+                       
+                <field name="bot_token" password="1"/>
+                
+                <button name="action_start_bot" 
+                        string="Start Bot" 
+                        type="object" 
+                        class="oe_highlight" 
+                        icon="fa-play"
+                        invisible="bot_running == True"/>
+                <button name="action_stop_bot" 
+                        string="Stop Bot" 
+                        type="object" 
+                        class="btn-danger" 
+                        icon="fa-stop"
+                        invisible="bot_running == False"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_telegram_config_form" model="ir.ui.view">
+        <field name="name">telegram.config.form</field>
+        <field name="model">telegram.config</field>
+        <field name="arch" type="xml">
+            <form string="Telegram Bot Configuration">
+                <header>
+                    <button name="action_start_bot" 
+                            string="Start Bot" 
+                            type="object" 
+                            class="oe_highlight" 
+                            icon="fa-play"
+                            invisible="bot_running == True"/>
+                    <button name="action_stop_bot" 
+                            string="Stop Bot" 
+                            type="object" 
+                            class="btn-danger" 
+                            icon="fa-stop"
+                            invisible="bot_running == False"/>
+                    <field name="bot_running" 
+                        widget="bool_badge" 
+                        
+                        />
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="e.g. MyFans Official Bot"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Authentication">
+                            <field name="bot_token" password="1"/>
+                            <field name="owner_id"/>
+                        </group>
+                        <group string="Links &amp; Channels">
+                            <field name="channel_id"/>
+                            <field name="group_invite_link" widget="url"/>
+                            <field name="telegram_web_app_url" widget="url"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Instructions" name="instructions">
+                            <group>
+                                <html>
+                                    <p>
+                                        1. Get a token from <b>@BotFather</b>.<br/>
+                                        2. Ensure the bot is an <b>Admin</b> in your Channel and Group.<br/>
+                                        3. Click <b>Start Bot</b>. The bot runs in a background thread and will automatically check <i>MyFans User</i> profiles for the <b>Allowed URL Message</b> permission.
+                                    </p>
+                                </html>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_telegram_config_list" model="ir.actions.act_window">
+        <field name="name">Telegram Bot Configuration</field>
+        <field name="res_model">telegram.config</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_telegram_bot_root" 
+              name="Telegram Bot" 
+              parent="base.menu_administration" 
+              sequence="100"/>
+
+    <menuitem id="menu_telegram_config_action" 
+              name="Configuration" 
+              parent="menu_telegram_bot_root" 
+              action="action_telegram_config_list" 
+              sequence="10"/>
+</odoo>

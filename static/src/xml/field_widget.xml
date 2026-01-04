@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+
+<template>
+    <t t-name="BoolBadge" owl="1">
+        <span class="badge rounded-circle p-2 border status-dot"
+              t-att-class="value ? 'bg-success' : 'bg-danger'"
+              t-on-click="() => this.updateValue(!value)"
+              style="width: 15px; height: 15px; display: inline-block;">
+            </span>
+    </t>
+</template>
+<!-- <template>
+    <t t-name="BoolBadge" owl="1">
+        <span class="badge rounded-circle p-2 border"
+                t-att-class="value ? 'bg-success text-white' : 'bg-danger text-white'"
+                t-on-click="() => this.updateValue(!value)">
+            <i t-att-class="value ? 'fa fa-check' : 'fa fa-times'"/>
+        </span>
+    </t>
+</template> -->
