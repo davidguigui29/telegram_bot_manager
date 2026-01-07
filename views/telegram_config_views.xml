@@ -65,8 +65,16 @@
                         </group>
                         <group string="Links &amp; Channels">
                             <field name="channel_id"/>
+                            <field name="channel_link" widget="url"/>
+                            <field name="group_link" widget="url"/>
                             <field name="group_invite_link" widget="url"/>
                             <field name="telegram_web_app_url" widget="url"/>
+                        </group>
+                        <group string="Bot Customization">
+                            <field name="website_name"/>
+                            <field name="log_message_id"/>
+                            <field name="allowed_commands" placeholder="start,setup_post,hello"/>
+                            <field name="auto_start"/>
                         </group>
                     </group>
                     <notebook>
@@ -93,7 +101,26 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <menuitem id="menu_telegram_bot_root" 
+
+    <menuitem id="telegram_config_menu_root" 
+              name="MyTelegram" 
+              web_icon="base,static/description/icon.png"
+              sequence="10"/>
+
+    <menuitem id="menu_telegram_management" 
+              name="Bot Management" 
+              parent="telegram_config_menu_root" 
+              sequence="10"/>
+
+    <menuitem id="menu_telegram_config_action" 
+              name="Bot Settings" 
+              parent="telegram_config_menu_root" 
+              action="action_telegram_config_list" 
+              sequence="10"/>
+
+            
+
+    <!-- <menuitem id="menu_telegram_bot_root" 
               name="Telegram Bot" 
               parent="base.menu_administration" 
               sequence="100"/>
@@ -102,5 +129,5 @@
               name="Configuration" 
               parent="menu_telegram_bot_root" 
               action="action_telegram_config_list" 
-              sequence="10"/>
+              sequence="10"/> -->
 </odoo>

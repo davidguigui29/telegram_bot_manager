@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+
+    <record id="oauth_provider_telegram" model="auth.oauth.provider">
+        <field name="name">Telegram</field>
+        <field name="client_id">telegram</field>
+        <field name="enabled">True</field>
+        <field name="auth_endpoint">https://telegram.org</field>
+        <field name="scope">openid</field>
+        <field name="validation_endpoint">https://telegram.org</field>
+        <field name="data_endpoint">https://telegram.org</field>
+        <field name="css_class">fa fa-telegram</field>
+    </record>
+
+
+</odoo>
