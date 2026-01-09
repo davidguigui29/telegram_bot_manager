@@ -745,98 +745,6 @@ class TelegramBotThread(threading.Thread):
                 
                 return CHOOSING_METHOD
 
-    # async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #     # 1. Handle Button Clicks (Callback Queries)
-    #     if update.callback_query:
-    #         await update.callback_query.answer()
-
-    #     user = update.effective_user
-    #     user_mention = user.mention_html()
-    #     identifier = user.username if user.username else str(user.id)
-    #     identifier_styled = f"<code>{identifier}</code>"
-
-        
-    #     # Always use self.get_odoo_user logic first
-    #     odoo_data = self.get_odoo_user(identifier)
-    #     print(f"DEBUG: Odoo Data is: {odoo_data}")
-    #     # await update.message.reply_text("🔄 Checking your membership status, please wait...")
-    #     if update.effective_chat.type == "supergroup":
-    #         print(f"DEBUG: We are in a supergroup!")
-    #         keyboard = [[InlineKeyboardButton("Go to your Assistant📢", url=f"{self.config['BOT_INBOX_URL']}?start=join")]]
-    #         reply_markup = InlineKeyboardMarkup(keyboard)
-    #         await update.message.reply_text(
-    #             text=f"Hey {user.mention_html()}! \n\n",
-    #             reply_markup=reply_markup,
-    #             parse_mode=ParseMode.HTML
-    #         )
-    #         return
-
-                
-
-    #     if odoo_data and update.effective_chat.type == "private":
-
-            
-
-    #         # Check if they are in the Telegram Channel
-    #         is_in_channel = await self.is_member(user.id, context)
-            
-    #         if not is_in_channel:
-    #             # User is in Odoo but NOT in the Telegram Channel
-    #             channel_username = self.config['CHANNEL_ID'].replace('@', '')
-    #             keyboard = [[InlineKeyboardButton(f"Join Channel 📢", url=f"https://t.me/{channel_username}")]]
-    #             reply_markup = InlineKeyboardMarkup(keyboard)
-                
-    #             await update.message.reply_text(
-    #                 text=f"Welcome back {odoo_data['name']}! \n\n"
-    #                      f"⚠️ You are registered on our site, but you must join our channel "
-    #                      f"to access the group features.",
-    #                 reply_markup=reply_markup
-    #             )
-    #         else:
-    #             # Check if it is a private chat with the bot
-    #             print(update.effective_chat.type)
-    #             if update.effective_chat.type == "private":
-    #                 keyboard = [
-    #                     [InlineKeyboardButton("Back to Channel", url=self.config['CHANNEL_LINK'])],
-    #                     [InlineKeyboardButton("Back to Group", url=self.config['GROUP_LINK'])]
-    #                 ]
-    #                 reply_markup = InlineKeyboardMarkup(keyboard)
-
-    #                 await update.message.reply_text(
-    #                     text=f"Welcome back {odoo_data['name']}! You are fully verified. ✅",
-    #                     reply_markup=reply_markup
-    #                 )
-
-    #             else:
-    #                 # User is in Odoo AND in the Channel
-    #                 await update.message.reply_text(f"Welcome back {odoo_data['name']}! You are fully verified. ✅")
-    
-    #         return ConversationHandler.END
-
-    #     else:
-    #         if update.effective_chat.type == "private":            
-    #             # 1. Prepare the choice buttons
-    #             keyboard = [
-    #                 [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
-    #                 [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
-    #                 [InlineKeyboardButton("Cancel Registration ❌", callback_data="cancel_reg")] 
-    #             ]
-    #             reply_markup = InlineKeyboardMarkup(keyboard)
-
-    #             # 2. Inform the user and present the choice
-    #             await update.message.reply_text(
-    #                 text=(
-    #                     f"<b>Welcome, {user_mention}!</b> ✨\n\n"
-    #                     f"We couldn't find an account linked to your Telegram.\n"
-    #                     f"How would you like to register on {self.config['WEBSITE_NAME']}?"
-    #                 ),
-    #                 parse_mode=ParseMode.HTML,
-    #                 reply_markup=reply_markup
-    #             )
-                
-    #             # 3. CRITICAL: Return the state to start the ConversationHandler
-    #             # This constant should be defined at the top of your file (e.g., CHOOSING_METHOD = 0)
-    #             return CHOOSING_METHOD
             
 
     
@@ -851,7 +759,7 @@ class TelegramBotThread(threading.Thread):
             chat = update.effective_chat
             
             # Safety check: only run in groups
-            if chat.type not in ["channel", "group", "supergroup"]:
+            if chat.type not in ["group", "supergroup"]:
                 return
 
             identifier = user.username if user.username else str(user.id)
