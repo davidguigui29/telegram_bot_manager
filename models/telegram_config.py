@@ -15,6 +15,8 @@ class TelegramConfig(models.Model):
 
     name = fields.Char(default="Bot Config")
     bot_token = fields.Char(string="Token", required=True)
+    bot_inbox_url = fields.Char(string="Bot Inbox URL", required=True)
+    dashboard_url = fields.Char(string="Dashboard URL")
     channel_link = fields.Char(string="Channel Link", default="https://t.me/GuidasDeveloper")
     group_invite_link = fields.Char(string="Group Invite Link", default="https://t.me/GuidasDeveloper")
     group_link = fields.Char(string="Group Link", default="https://t.me/GuidasDeveloper")
@@ -88,6 +90,8 @@ class TelegramConfig(models.Model):
             'GROUP_LINK': self.group_invite_link,
             'CHANNEL_ID': self.channel_id,
             'OWNER_ID': self.owner_id,
+            'DASHBOARD_URL': self.dashboard_url,
+            'BOT_INBOX_URL': self.bot_inbox_url,
             'TELEGRAM_WEB_APP_URL': self.telegram_web_app_url,
             'WEBSITE_NAME': self.website_name,
             'LOG_FILE': self.log_message_id,

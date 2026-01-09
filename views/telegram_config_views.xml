@@ -68,6 +68,8 @@
                             <field name="channel_link" widget="url"/>
                             <field name="group_link" widget="url"/>
                             <field name="group_invite_link" widget="url"/>
+                            <field name="dashboard_url" widget="url"/>
+                            <field name="bot_inbox_url" widget="url"/>
                             <field name="telegram_web_app_url" widget="url"/>
                         </group>
                         <group string="Bot Customization">
