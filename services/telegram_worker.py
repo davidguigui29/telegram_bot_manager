@@ -24,7 +24,9 @@ _logger = logging.getLogger(__name__)
 # LOG_FILE = "message_id.txt"
 # ALLOWED_COMMANDS = ["start", "setup_post", "hello"]
 # Registration States
-CHOOSING_METHOD, WAITING_EMAIL, WAITING_PASSWORD, WAITING_OTP, WAITING_PHONE = range(5)
+# Constants at the top
+CHOOSING_METHOD, WAITING_EMAIL, WAITING_PASSWORD, WAITING_OTP, WAITING_PHONE, WAITING_LINK_LOGIN, WAITING_LINK_PASSWORD = range(7)
+# CHOOSING_METHOD, WAITING_EMAIL, WAITING_PASSWORD, WAITING_OTP, WAITING_PHONE = range(5)
 
 class TelegramBotThread(threading.Thread):
     def __init__(self, dbname, token, config):
@@ -51,12 +53,16 @@ class TelegramBotThread(threading.Thread):
                 CHOOSING_METHOD: [
                     CallbackQueryHandler(self.email_choice, pattern="^reg_email$"),
                     CallbackQueryHandler(self.phone_choice, pattern="^reg_phone$"),
+                    CallbackQueryHandler(self.registration_choice_menu, pattern="^reg_start_choice$"),
+                    CallbackQueryHandler(self.link_account_choice, pattern="^link_existing$"),
                     CallbackQueryHandler(self.cancel_reg, pattern="^cancel_reg$"),
                 ],
                 WAITING_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_email)],
                 WAITING_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_password)],
                 WAITING_PHONE: [MessageHandler(filters.CONTACT, self.process_phone)],
                 WAITING_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.finalize_registration)],
+                WAITING_LINK_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_link_login)],
+                WAITING_LINK_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_link_password)],
             },
             fallbacks=[CommandHandler("cancel", self.cancel_reg)],
             per_message=False,
@@ -172,24 +178,39 @@ class TelegramBotThread(threading.Thread):
             _logger.error(f"OTP Email Error: {e}")
             return False
 
-    def get_odoo_user(self, telegram_handle):
-        """Helper to query Odoo database for the user profile"""
-        # Create a new registry environment for this thread
+    def get_odoo_user(self, tg_user):
+        """Helper to query Odoo using permanent ID first, then username."""
+        tg_id = str(tg_user.id)
+        tg_handle = tg_user.username
+        
         db_registry = odoo.modules.registry.Registry(self.dbname)
         with db_registry.cursor() as cr:
             env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
-            # Search for the user in your MyFansUser model
-            # We search by telegram_username (case insensitive) or ID
+            
+            # Search priority:
+            # 1. Match the permanent ID
+            # 2. Match the username (useful for pre-existing records)
             user_profile = env['myfans.user'].search([
-                '|', 
-                ('telegram_username', '=', telegram_handle),
-                ('user_id.login', '=', telegram_handle)
+                '|',
+                ('telegram_id', '=', tg_id),
+                ('telegram_username', '=', tg_handle)
             ], limit=1)
             
             if user_profile:
-                # Return relevant flags
+                vals = {}
+                # 1. Update Username if it changed
+                if tg_handle and user_profile.telegram_username != tg_handle:
+                    vals['telegram_username'] = tg_handle
+                
+                # 2. AUTO-UPGRADE: Save the permanent ID if Odoo doesn't have it yet
+                if not user_profile.telegram_id:
+                    vals['telegram_id'] = tg_id
+                
+                if vals:
+                    user_profile.sudo().write(vals)
+                    cr.commit()
+
                 return {
-                    # 'allowed': True,
                     'allowed': user_profile.allowed_url_message,
                     'name': user_profile.display_name,
                     'status': user_profile.account_status,
@@ -218,7 +239,8 @@ class TelegramBotThread(threading.Thread):
             # If triggered by /cancel command
             await update.message.reply_text(
                 "Registration cancelled. You can type /start whenever you're ready to try again.",
-                reply_markup=ReplyKeyboardRemove()
+                reply_markup=start_keyboard
+                # reply_markup=ReplyKeyboardRemove()
             )
 
         context.user_data.clear()
@@ -499,7 +521,9 @@ class TelegramBotThread(threading.Thread):
                 # This triggers the automatic profile creation logic in your res_users.py
                 env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {
                     'tg_username': tg_username,
-                    'tg_bio': tg_bio, 
+                    'tg_bio': tg_bio,
+                    'tg_id': user_id,
+                     
                 })
                 
                 # 1. Find Company
@@ -612,7 +636,7 @@ class TelegramBotThread(threading.Thread):
 
         # Check Odoo Permissions
         identifier = user.username if user.username else str(user.id)
-        odoo_data = self.get_odoo_user(identifier)
+        odoo_data = self.get_odoo_user(user)
 
         # Logic: If user not found in Odoo or not allowed_url_message
         if not odoo_data or not odoo_data.get('allowed'):
@@ -673,7 +697,7 @@ class TelegramBotThread(threading.Thread):
         identifier = user.username if user.username else str(user.id)
         
         # Always use self.get_odoo_user logic first
-        odoo_data = self.get_odoo_user(identifier)
+        odoo_data = self.get_odoo_user(user)
         
         # USE update.effective_message INSTEAD OF update.message
         if update.effective_chat.type == "supergroup":
@@ -723,29 +747,225 @@ class TelegramBotThread(threading.Thread):
     
             return ConversationHandler.END
 
+        
         else:
             if update.effective_chat.type == "private":            
                 keyboard = [
-                    [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
-                    [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
-                    [InlineKeyboardButton("Cancel Registration ❌", callback_data="cancel_reg")] 
+                    [
+                        InlineKeyboardButton("Create New Account ✨", callback_data="reg_start_choice"),
+                        InlineKeyboardButton("Link My Account 🔗", callback_data="link_existing")
+                    ],
+                    [InlineKeyboardButton("Cancel ❌", callback_data="cancel_reg")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
-                # Changed to update.effective_message
                 await update.effective_message.reply_text(
                     text=(
-                        f"<b>Welcome, {user_mention}!</b> ✨\n\n"
-                        f"We couldn't find an account linked to your Telegram.\n"
-                        f"How would you like to register on {self.config['WEBSITE_NAME']}?"
+                        f"<b>Welcome to {self.config['WEBSITE_NAME']}, {user_mention}!</b> 👋\n\n"
+                        f"To get started, would you like to create a new profile or "
+                        f"link your existing Myfansbook account?"
                     ),
                     parse_mode=ParseMode.HTML,
                     reply_markup=reply_markup
                 )
-                
                 return CHOOSING_METHOD
 
-            
+
+        # else:
+        #     if update.effective_chat.type == "private":            
+        #         # keyboard = [
+        #         #     [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
+        #         #     [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
+        #         #     [InlineKeyboardButton("Cancel Registration ❌", callback_data="cancel_reg")] 
+        #         # ]
+        #         # Inside start_command
+        #         keyboard = [
+        #             [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
+        #             [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
+        #             [InlineKeyboardButton("I already have an account 🔗", callback_data="link_existing")], # New
+        #             [InlineKeyboardButton("Cancel Registration ❌", callback_data="cancel_reg")]
+        #         ]
+        #         reply_markup = InlineKeyboardMarkup(keyboard)
+
+        #         # Changed to update.effective_message
+        #         await update.effective_message.reply_text(
+        #             text=(
+        #                 f"<b>Welcome, {user_mention}!</b> ✨\n\n"
+        #                 f"We couldn't find an account linked to your Telegram.\n"
+        #                 f"How would you like to register on {self.config['WEBSITE_NAME']}?"
+        #             ),
+        #             parse_mode=ParseMode.HTML,
+        #             reply_markup=reply_markup
+        #         )
+                
+        #         return CHOOSING_METHOD
+
+    async def registration_choice_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Intermediate menu to choose registration method."""
+        query = update.callback_query
+        await query.answer()
+        
+        keyboard = [
+            [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
+            [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="cancel_reg")]
+        ]
+        await query.edit_message_text(
+            "How would you like to register?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return CHOOSING_METHOD
+
+    async def link_account_choice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Prompt user for their website login."""
+        keyboard = [
+            [InlineKeyboardButton("Cancel", callback_data="cancel_reg")]
+
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text(
+            text="Please enter your Myfansbook Login (Email or Username):",
+            reply_markup=reply_markup)
+
+        return WAITING_LINK_LOGIN
+
+    async def process_link_login(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Store the login and ask for password."""
+        keyboard = [
+            [InlineKeyboardButton("Cancel", callback_data="cancel_reg")]
+
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.user_data['link_login'] = update.message.text.strip()
+        await update.message.reply_text(
+            text="Please enter your password:",
+            reply_markup=reply_markup)
+        return WAITING_LINK_PASSWORD
+
+
+    async def process_link_password(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Verify credentials and link the account."""
+        login = context.user_data.get('link_login')
+        password = update.message.text
+        # Use effective_user to get the person who sent the message
+        tg_user = update.effective_user
+        tg_username = tg_user.username if tg_user.username else str(tg_user.id)
+
+        db_registry = odoo.modules.registry.Registry(self.dbname)
+        with db_registry.cursor() as cr:
+            env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
+            try:
+                # Odoo authenticate signature: authenticate(db, credentials, user_agent_env)
+                
+                user_agent_env = {'interactive': False}
+                credentials = {
+                    'login': login, 
+                    'password': password, 
+                    'type': 'password'
+                }
+                
+                # IMPORTANT: Call it via the class or env to match the signature correctly
+                result = env['res.users'].authenticate(
+                    self.dbname, 
+                    credentials,
+                    user_agent_env=user_agent_env
+                )
+
+                uid = result.get('uid') if isinstance(result, dict) else result
+                
+                _logger.info(f"DEBUG: Extracted UID for browse: {uid}")
+
+
+                if uid:
+                    user = env['res.users'].sudo().browse(uid)
+                    
+                    # Link the telegram username to the Partner (res.partner)
+                    user.partner_id.write({
+                        'telegram_id': str(tg_user.id),
+                        'telegram_username': tg_username,
+                        
+                        })
+                    
+                    # Also link to the MyFans profile (myfans.user) if it exists
+                    # profile = env['myfans.user'].sudo().search([('user_id', '=', uid)], limit=1)
+                    # if profile:
+                    #     profile.write({'telegram_username': tg_username})
+
+                    cr.commit()
+                    
+                    await update.message.reply_text(
+                        f"✅ Success! Your Telegram account is now linked to <b>{user.name}</b>.\n\n"
+                        "You are now fully verified.",
+                        parse_mode=ParseMode.HTML
+                    )
+                    return ConversationHandler.END
+                
+            except odoo.exceptions.AccessDenied:
+                # This is the standard Odoo error for wrong credentials
+                await update.message.reply_text("❌ Invalid login or password. Authentication failed.")
+                return await self.show_retry_menu(update)
+                
+            except Exception as e:
+                _logger.error(f"Linking Error: {str(e)}")
+                await update.message.reply_text("❌ A technical error occurred. Please try again later.")
+                return ConversationHandler.END
+
+    async def show_retry_menu(self, update):
+        keyboard = [
+            [InlineKeyboardButton("Try Login Again 🔑", callback_data="link_existing")],
+            [InlineKeyboardButton("Sign up instead ✨", callback_data="reg_start_choice")]
+        ]
+        await update.message.reply_text(
+            "Would you like to try again or create a new account?", 
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return CHOOSING_METHOD
+
+    # async def process_link_password(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    #     """Verify credentials and link the account."""
+    #     login = context.user_data.get('link_login')
+    #     password = update.message.text
+    #     tg_username = update.effective_user.username
+
+    #     db_registry = odoo.modules.registry.Registry(self.dbname)
+    #     with db_registry.cursor() as cr:
+    #         env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
+    #         try:
+    #             # 1. Authenticate with Odoo
+    #             uid = env['res.users'].authenticate(self.dbname, login, password)
+    #             if uid:
+    #                 # 2. Link the telegram_username to this user
+    #                 user = env['res.users'].browse(uid)
+    #                 # We update both the partner (for storage) and the context logic
+    #                 user.partner_id.sudo().write({'telegram_username': tg_username})
+                    
+    #                 # If you have the myfans.user model, ensure it's synced
+    #                 profile = env['myfans.user'].sudo().search([('user_id', '=', uid)], limit=1)
+    #                 if profile:
+    #                     profile.write({'telegram_username': tg_username})
+
+    #                 cr.commit()
+                    
+    #                 await update.message.reply_text(
+    #                     f"✅ Success! Your Telegram account is now linked to <b>{user.name}</b>.\n"
+    #                     "You can now access all features.",
+    #                     parse_mode=ParseMode.HTML
+    #                 )
+    #                 return ConversationHandler.END
+                
+    #         except Exception as e:
+    #             _logger.error(f"Linking Error: {e}")
+    #             await update.message.reply_text("❌ Invalid login or password. Would you like to try again or sign up?")
+    #             # Provide buttons to try again or switch to signup
+    #             keyboard = [
+    #                 [InlineKeyboardButton("Try Login Again 🔑", callback_data="link_existing")],
+    #                 [InlineKeyboardButton("Sign up instead ✨", callback_data="reg_email")]
+    #             ]
+    #             await update.message.reply_text("Choose an option:", reply_markup=InlineKeyboardMarkup(keyboard))
+    #             return CHOOSING_METHOD
 
     
     async def welcome_new_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -763,7 +983,7 @@ class TelegramBotThread(threading.Thread):
                 return
 
             identifier = user.username if user.username else str(user.id)
-            odoo_data = self.get_odoo_user(identifier)
+            odoo_data = self.get_odoo_user(user)
             
             # --- CASE 1: NOT ON WEBSITE ---
             if not odoo_data:
