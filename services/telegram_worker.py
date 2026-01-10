@@ -63,6 +63,19 @@ class TelegramBotThread(threading.Thread):
                 WAITING_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.finalize_registration)],
                 WAITING_LINK_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_link_login)],
                 WAITING_LINK_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_link_password)],
+
+                WAITING_LINK_LOGIN: [
+                # 1. Listen for the Cancel button click (Callback)
+                CallbackQueryHandler(self.cancel_reg, pattern="^cancel_reg$"),
+                # 2. Listen for the actual text input
+                MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_link_login),
+            ],
+            
+            WAITING_LINK_PASSWORD: [
+                # Add it here too so they can cancel while entering the password
+                CallbackQueryHandler(self.cancel_reg, pattern="^cancel_reg$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, self.process_link_password),
+            ],
             },
             fallbacks=[CommandHandler("cancel", self.cancel_reg)],
             per_message=False,
@@ -181,28 +194,30 @@ class TelegramBotThread(threading.Thread):
     def get_odoo_user(self, tg_user):
         """Helper to query Odoo using permanent ID first, then username."""
         tg_id = str(tg_user.id)
-        tg_handle = tg_user.username
+        tg_handle = tg_user.username # This will be None/False if not set
         
         db_registry = odoo.modules.registry.Registry(self.dbname)
         with db_registry.cursor() as cr:
             env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
             
-            # Search priority:
-            # 1. Match the permanent ID
-            # 2. Match the username (useful for pre-existing records)
-            user_profile = env['myfans.user'].search([
-                '|',
-                ('telegram_id', '=', tg_id),
-                ('telegram_username', '=', tg_handle)
-            ], limit=1)
+            # Construct the domain dynamically
+            # We ALWAYS search by ID
+            domain = [('telegram_id', '=', tg_id)]
+            
+            # ONLY add the username to the search if it exists
+            # This prevents matching a user with no username against an Odoo record with no username
+            if tg_handle:
+                domain = ['|'] + domain + [('telegram_username', '=', tg_handle)]
+            
+            user_profile = env['myfans.user'].search(domain, limit=1)
             
             if user_profile:
                 vals = {}
-                # 1. Update Username if it changed
+                # Update username if it changed or was newly set
                 if tg_handle and user_profile.telegram_username != tg_handle:
                     vals['telegram_username'] = tg_handle
                 
-                # 2. AUTO-UPGRADE: Save the permanent ID if Odoo doesn't have it yet
+                # Auto-link the ID if we found them via username but ID was missing
                 if not user_profile.telegram_id:
                     vals['telegram_id'] = tg_id
                 
@@ -819,14 +834,14 @@ class TelegramBotThread(threading.Thread):
     async def link_account_choice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Prompt user for their website login."""
         keyboard = [
-            [InlineKeyboardButton("Cancel", callback_data="cancel_reg")]
+            [InlineKeyboardButton("Cancel ❌", callback_data="cancel_reg")]
 
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query = update.callback_query
         await query.answer()
         await query.edit_message_text(
-            text="Please enter your Myfansbook Login (Email or Username):",
+            text="Please enter your Myfansbook Login (Email/Phone/Username): \nEg. +233xxxxxxxx0",
             reply_markup=reply_markup)
 
         return WAITING_LINK_LOGIN
