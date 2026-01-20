@@ -786,34 +786,6 @@ class TelegramBotThread(threading.Thread):
                 return CHOOSING_METHOD
 
 
-        # else:
-        #     if update.effective_chat.type == "private":            
-        #         # keyboard = [
-        #         #     [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
-        #         #     [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
-        #         #     [InlineKeyboardButton("Cancel Registration ❌", callback_data="cancel_reg")] 
-        #         # ]
-        #         # Inside start_command
-        #         keyboard = [
-        #             [InlineKeyboardButton("Sign up with Email 📧", callback_data="reg_email")],
-        #             [InlineKeyboardButton("Sign up with Phone 📱", callback_data="reg_phone")],
-        #             [InlineKeyboardButton("I already have an account 🔗", callback_data="link_existing")], # New
-        #             [InlineKeyboardButton("Cancel Registration ❌", callback_data="cancel_reg")]
-        #         ]
-        #         reply_markup = InlineKeyboardMarkup(keyboard)
-
-        #         # Changed to update.effective_message
-        #         await update.effective_message.reply_text(
-        #             text=(
-        #                 f"<b>Welcome, {user_mention}!</b> ✨\n\n"
-        #                 f"We couldn't find an account linked to your Telegram.\n"
-        #                 f"How would you like to register on {self.config['WEBSITE_NAME']}?"
-        #             ),
-        #             parse_mode=ParseMode.HTML,
-        #             reply_markup=reply_markup
-        #         )
-                
-        #         return CHOOSING_METHOD
 
     async def registration_choice_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Intermediate menu to choose registration method."""

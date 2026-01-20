@@ -1,6 +1,7 @@
 {
     'name': 'Telegram Bot Manager',
     'version': '1.0',
+    "category": "Tools",
     'depends': ['base', 'myfansbook_core', 'website', 'auth_signup', 'auth_oauth'], 
     'sequence': 2,
     'data': [
